@@ -70,11 +70,6 @@ com.company.project/
 ## Entity
 
 ```java
-@Getter
-@Setter  // ⚠️ 不用 @Data，避免 equals/hashCode 問題
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 @Entity
 @Table(name = "orders")
 public class Order {
@@ -104,6 +99,38 @@ public class Order {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    // JPA 需要無參數建構子
+    protected Order() {}
+
+    private Order(String orderNumber, String customerName,
+                  BigDecimal totalAmount, OrderStatus status) {
+        this.orderNumber = orderNumber;
+        this.customerName = customerName;
+        this.totalAmount = totalAmount;
+        this.status = status;
+    }
+
+    // 工廠方法取代 Builder
+    public static Order create(String orderNumber, String customerName,
+                               BigDecimal totalAmount, OrderStatus status) {
+        return new Order(orderNumber, customerName, totalAmount, status);
+    }
+
+    // Getters
+    public Long getId() { return id; }
+    public String getOrderNumber() { return orderNumber; }
+    public String getCustomerName() { return customerName; }
+    public BigDecimal getTotalAmount() { return totalAmount; }
+    public OrderStatus getStatus() { return status; }
+    public List<OrderItem> getItems() { return items; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+
+    // Setters（僅暴露業務上需要變更的欄位）
+    public void setCustomerName(String customerName) { this.customerName = customerName; }
+    public void setTotalAmount(BigDecimal totalAmount) { this.totalAmount = totalAmount; }
+    public void setStatus(OrderStatus status) { this.status = status; }
 
     @PrePersist
     protected void onCreate() {
@@ -144,12 +171,16 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 ## Service
 
 ```java
-@Slf4j
 @Service
-@RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
 
+    private static final Logger log = LoggerFactory.getLogger(OrderServiceImpl.class);
+
     private final OrderRepository orderRepository;
+
+    public OrderServiceImpl(OrderRepository orderRepository) {
+        this.orderRepository = orderRepository;
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -168,12 +199,12 @@ public class OrderServiceImpl implements OrderService {
             throw new BusinessException(ErrorCode.ORDER_NUMBER_DUPLICATED);
         }
 
-        Order order = Order.builder()
-            .orderNumber(request.orderNumber())
-            .customerName(request.customerName())
-            .totalAmount(request.totalAmount())
-            .status(OrderStatus.PENDING)
-            .build();
+        Order order = Order.create(
+            request.orderNumber(),
+            request.customerName(),
+            request.totalAmount(),
+            OrderStatus.PENDING
+        );
 
         return OrderResponse.from(orderRepository.save(order));
     }
@@ -230,10 +261,13 @@ public class OrderServiceImpl implements OrderService {
 ```java
 @RestController
 @RequestMapping("/api/orders")
-@RequiredArgsConstructor
 public class OrderController {
 
     private final OrderService orderService;
+
+    public OrderController(OrderService orderService) {
+        this.orderService = orderService;
+    }
 
     @GetMapping("/{id}")
     public OrderResponse getOrder(@PathVariable Long id) {
@@ -333,8 +367,6 @@ public record OrderResponse(
 
 ```java
 // ErrorCode.java
-@Getter
-@RequiredArgsConstructor
 public enum ErrorCode {
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "找不到訂單"),
     ORDER_NUMBER_DUPLICATED(HttpStatus.CONFLICT, "訂單編號已存在"),
@@ -344,10 +376,17 @@ public enum ErrorCode {
 
     private final HttpStatus status;
     private final String message;
+
+    ErrorCode(HttpStatus status, String message) {
+        this.status = status;
+        this.message = message;
+    }
+
+    public HttpStatus getStatus() { return status; }
+    public String getMessage() { return message; }
 }
 
 // BusinessException.java
-@Getter
 public class BusinessException extends RuntimeException {
     private final ErrorCode errorCode;
 
@@ -355,12 +394,15 @@ public class BusinessException extends RuntimeException {
         super(errorCode.getMessage());
         this.errorCode = errorCode;
     }
+
+    public ErrorCode getErrorCode() { return errorCode; }
 }
 
 // GlobalExceptionHandler.java
-@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusiness(BusinessException ex) {
@@ -413,6 +455,8 @@ public record ErrorResponse(boolean success, String code, String message) {}
 
 ```java
 // ✅ 正確
+private static final Logger log = LoggerFactory.getLogger(OrderServiceImpl.class);
+
 log.info("建立訂單: {}", orderNumber);
 log.error("建立失敗", exception);
 
@@ -427,7 +471,7 @@ e.printStackTrace();
 
 | 錯誤 | 正確做法 |
 |------|----------|
-| Entity 用 `@Data` | 改用 `@Getter` + `@Setter` |
+| Entity 用 `@Data` | 手寫 getter/setter，僅暴露需要變更的欄位 |
 | Controller 有業務邏輯 | 業務邏輯放 Service |
 | Service 回傳 Entity | 回傳 Response DTO |
 | 忘記 `@Transactional` | 查詢用 readOnly，寫入用 rollbackFor |
