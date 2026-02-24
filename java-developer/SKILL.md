@@ -17,10 +17,10 @@ allowed-tools: Read, Write, Glob, Grep, Bash(mvn:*, gradle:*)
 
 ### ✅ 允許的依賴
 
-- Spring Core 註解（`@Service`, `@Component`, `@RequiredArgsConstructor`）
-- Lombok 註解（`@Getter`, `@Builder`, `@Value`, `@Slf4j`）
-- JDK 標準庫
+- Spring Core 註解（`@Service`, `@Component`）
+- JDK 標準庫（含 `record`）
 - Spring Data 介面（`Page`, `Pageable`）
+- SLF4J（`LoggerFactory`）
 
 ### ❌ 禁止的依賴
 
@@ -34,10 +34,6 @@ allowed-tools: Read, Write, Glob, Grep, Bash(mvn:*, gradle:*)
 
 ```java
 // domain/model/Order.java
-@Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-@Builder
 public class Order {
     private Long id;
     private String orderNumber;
@@ -47,16 +43,40 @@ public class Order {
     private OrderStatus status;
     private LocalDateTime createdAt;
 
+    protected Order() {}
+
+    private Order(Long id, String orderNumber, CustomerId customerId,
+                  List<OrderItem> items, Money totalAmount,
+                  OrderStatus status, LocalDateTime createdAt) {
+        this.id = id;
+        this.orderNumber = orderNumber;
+        this.customerId = customerId;
+        this.items = items;
+        this.totalAmount = totalAmount;
+        this.status = status;
+        this.createdAt = createdAt;
+    }
+
+    // Getters
+    public Long getId() { return id; }
+    public String getOrderNumber() { return orderNumber; }
+    public CustomerId getCustomerId() { return customerId; }
+    public List<OrderItem> getItems() { return Collections.unmodifiableList(items); }
+    public Money getTotalAmount() { return totalAmount; }
+    public OrderStatus getStatus() { return status; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+
     // 工廠方法
     public static Order create(CustomerId customerId, List<OrderItem> items) {
-        return Order.builder()
-            .orderNumber(generateOrderNumber())
-            .customerId(customerId)
-            .items(new ArrayList<>(items))
-            .totalAmount(calculateTotal(items))
-            .status(OrderStatus.PENDING)
-            .createdAt(LocalDateTime.now())
-            .build();
+        return new Order(
+            null,
+            generateOrderNumber(),
+            customerId,
+            new ArrayList<>(items),
+            calculateTotal(items),
+            OrderStatus.PENDING,
+            LocalDateTime.now()
+        );
     }
 
     // 領域行為 - 業務邏輯放這裡
@@ -87,13 +107,9 @@ public class Order {
 ## Value Object 實作
 
 ```java
-// domain/valueobject/Money.java
-@Value  // Lombok: 不可變物件
-public class Money {
+// domain/valueobject/Money.java — 使用 record 實作不可變物件
+public record Money(BigDecimal amount, Currency currency) {
     public static final Money ZERO = new Money(BigDecimal.ZERO, Currency.TWD);
-
-    BigDecimal amount;
-    Currency currency;
 
     public Money add(Money other) {
         if (!this.currency.equals(other.currency)) {
@@ -157,14 +173,22 @@ public interface OrderRepository {
 
 ```java
 // application/service/OrderService.java
-@Slf4j
 @Service
-@RequiredArgsConstructor
 public class OrderService {
+
+    private static final Logger log = LoggerFactory.getLogger(OrderService.class);
 
     private final OrderRepository orderRepository;
     private final CustomerRepository customerRepository;
     private final PricingService pricingService;
+
+    public OrderService(OrderRepository orderRepository,
+                        CustomerRepository customerRepository,
+                        PricingService pricingService) {
+        this.orderRepository = orderRepository;
+        this.customerRepository = customerRepository;
+        this.pricingService = pricingService;
+    }
 
     @Transactional(rollbackFor = Exception.class)
     public OrderResponse createOrder(CreateOrderCommand command) {
@@ -266,11 +290,14 @@ public record OrderResponse(
 // adapter/in/web/OrderController.java
 @RestController
 @RequestMapping("/api/v1/orders")
-@RequiredArgsConstructor
 @Tag(name = "訂單管理")
 public class OrderController {
 
     private final OrderService orderService;
+
+    public OrderController(OrderService orderService) {
+        this.orderService = orderService;
+    }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -347,10 +374,13 @@ public record OrderItemRequest(
 ```java
 // adapter/out/persistence/JpaOrderRepository.java
 @Repository
-@RequiredArgsConstructor
 public class JpaOrderRepository implements OrderRepository {
 
     private final SpringDataOrderRepository jpaRepo;
+
+    public JpaOrderRepository(SpringDataOrderRepository jpaRepo) {
+        this.jpaRepo = jpaRepo;
+    }
 
     @Override
     public Order save(Order order) {
@@ -407,8 +437,6 @@ public class BusinessException extends DomainException {
 }
 
 // application/exception/ErrorCode.java
-@Getter
-@RequiredArgsConstructor
 public enum ErrorCode {
     ORDER_NOT_FOUND("error.order.not_found", "找不到訂單"),
     ORDER_CANNOT_BE_CONFIRMED("error.order.cannot_confirm", "訂單無法確認"),
@@ -418,6 +446,14 @@ public enum ErrorCode {
 
     private final String code;
     private final String message;
+
+    ErrorCode(String code, String message) {
+        this.code = code;
+        this.message = message;
+    }
+
+    public String getCode() { return code; }
+    public String getMessage() { return message; }
 }
 ```
 
@@ -463,8 +499,13 @@ public record ErrorResponse(boolean success, String code, String message) {}
 
 ```java
 @Service
-@RequiredArgsConstructor
 public class OrderService {
+
+    private final OrderRepository orderRepository;
+
+    public OrderService(OrderRepository orderRepository) {
+        this.orderRepository = orderRepository;
+    }
 
     @Cacheable(value = "orders", key = "#orderId")
     @Transactional(readOnly = true)
@@ -528,10 +569,12 @@ app:
 @Configuration
 @ConfigurationProperties(prefix = "app.business.order")
 @Validated
-@Getter @Setter
 public class OrderProperties {
     @Min(1)
     private int maxItems = 100;
+
+    public int getMaxItems() { return maxItems; }
+    public void setMaxItems(int maxItems) { this.maxItems = maxItems; }
 }
 
 // 或使用 @Value
@@ -630,7 +673,7 @@ class OrderServiceTest {
 
 | 錯誤 | 正確做法 |
 |------|----------|
-| Domain 層依賴 JPA 註解 | Domain 只用純 Java + Lombok |
+| Domain 層依賴 JPA 註解 | Domain 只用純 Java（record、手寫 getter） |
 | Controller 有業務邏輯 | 業務邏輯放 Service |
 | Service 直接回傳 Entity | 使用 Response DTO |
 | 忘記 @Transactional | 寫入用 rollbackFor，查詢用 readOnly |
