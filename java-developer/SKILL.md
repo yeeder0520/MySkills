@@ -15,6 +15,9 @@ allowed-tools: Read, Write, Glob, Grep, Bash(mvn:*, gradle:*)
 
 ## Domain 層依賴規範
 
+> 架構分層原則（Clean Architecture 圖、依賴方向規則、套件結構）請參考 `architect` skill。
+> 以下僅列出 Java 實作層面的具體允許／禁止項目。
+
 ### ✅ 允許的依賴
 
 - Spring Core 註解（`@Service`, `@Component`）
