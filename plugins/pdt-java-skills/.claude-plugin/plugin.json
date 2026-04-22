@@ -1,0 +1,9 @@
+{
+  "name": "pdt-java-skills",
+  "version": "0.1.0",
+  "description": "Java/Spring Boot development skills including TDD, clean architecture, three-tier patterns, code review, brainstorming, and documentation writing.",
+  "author": {
+    "name": "yeeder0520",
+    "url": "https://github.com/yeeder0520"
+  }
+}

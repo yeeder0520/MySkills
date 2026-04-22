@@ -1,0 +1,21 @@
+{
+  "name": "pdt-marketplace",
+  "owner": {
+    "name": "yeeder0520",
+    "url": "https://github.com/yeeder0520"
+  },
+  "plugins": [
+    {
+      "name": "pdt-java-skills",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/yeeder0520/MySkills.git",
+        "path": "plugins/pdt-java-skills"
+      },
+      "version": "0.1.0",
+      "description": "Java/Spring Boot development skills: TDD, clean architecture, three-tier, code review, brainstorming, docs-writer.",
+      "category": "development",
+      "keywords": ["java", "spring-boot", "tdd", "clean-architecture", "code-review"]
+    }
+  ]
+}
