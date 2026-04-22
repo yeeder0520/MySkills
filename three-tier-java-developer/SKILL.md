@@ -1,6 +1,6 @@
 ---
 name: three-tier-java-developer
-description: 三層式架構 Java/Spring Boot 開發實作規範。當專案採用三層式架構，需要撰寫 Controller、Service、Repository 程式碼時使用。
+description: 當專案採用三層式架構，需要撰寫 Controller、Service、Repository 程式碼時使用。適用於簡單 CRUD、小型服務、POC/MVP 開發。
 allowed-tools: Read, Write, Glob, Grep, Bash(mvn:*, gradle:*)
 ---
 

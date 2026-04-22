@@ -1,6 +1,6 @@
 ---
 name: java-tdd
-description: 遵循 TDD 流程開發功能，撰寫 JUnit 5 / AssertJ / Mockito 測試。當需要實作任何功能、修 bug、或撰寫測試時使用。適用於所有 Java/Spring Boot 專案。
+description: 當需要實作任何功能、修 bug、或撰寫測試時使用。適用於所有 Java/Spring Boot 專案。
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(mvn:test*, mvn:verify*)
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: java-clean-arch
-description: Clean Architecture 系統設計與 Java/Spring Boot 實作規範。當需要設計系統架構、技術選型，或撰寫 Domain/Application/Adapter/Infrastructure 各層程式碼時使用。
+description: 當需要設計系統架構、技術選型，或撰寫 Domain/Application/Adapter/Infrastructure 各層程式碼時使用。
 allowed-tools: Read, Write, Glob, Grep, Bash(mvn:*, gradle:*)
 ---
 

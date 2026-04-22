@@ -1,74 +1,86 @@
 ---
 name: code-reviewer
-description:
-  Use this skill to review code. It supports both local changes (staged or working tree)
-  and remote Pull Requests (by ID or URL). It focuses on correctness, maintainability,
-  and adherence to project standards.
+description: 當需要檢視程式碼時使用。支援本地變更與遠端 Pull Request。
+allowed-tools: Read, Glob, Grep, Bash(git:*, gh:*, mvn:verify*, mvn:test*)
 ---
 
-# Code Reviewer
+# Code Review
 
-This skill guides the agent in conducting professional and thorough code reviews for both local development and remote Pull Requests.
+## 工作流程
 
-## Workflow
+### 1. 確認審查目標
 
-### 1. Determine Review Target
-*   **Remote PR**: If the user provides a PR number or URL (e.g., "Review PR #123"), target that remote PR.
-*   **Local Changes**: If no specific PR is mentioned, or if the user asks to "review my changes", target the current local file system states (staged and unstaged changes).
+- **遠端 PR**：用戶提供 PR 編號或 URL
+- **本地變更**：用戶說「review 我的變更」或未指定 PR
 
-### 2. Preparation
+### 2. 準備
 
-#### For Remote PRs:
-1.  **Checkout**: Use the GitHub CLI to checkout the PR.
-    ```bash
-    gh pr checkout <PR_NUMBER>
-    ```
-2.  **Preflight**: Execute the project's standard verification suite to catch automated failures early.
-    ```bash
-    npm run preflight
-    ```
-3.  **Context**: Read the PR description and any existing comments to understand the goal and history.
+#### 遠端 PR
 
-#### For Local Changes:
-1.  **Identify Changes**:
-    *   Check status: `git status`
-    *   Read diffs: `git diff` (working tree) and/or `git diff --staged` (staged).
-2.  **Preflight (Optional)**: If the changes are substantial, ask the user if they want to run `npm run preflight` before reviewing.
+```bash
+gh pr checkout <PR_NUMBER>
+./mvnw verify          # 先跑自動驗證，早期攔截失敗
+gh pr view <PR_NUMBER> # 讀取 PR 描述與現有討論
+```
 
-### 3. In-Depth Analysis
-Analyze the code changes based on the following pillars:
+#### 本地變更
 
-*   **Correctness**: Does the code achieve its stated purpose without bugs or logical errors?
-*   **Maintainability**: Is the code clean, well-structured, and easy to understand and modify in the future? Consider factors like code clarity, modularity, and adherence to established design patterns.
-*   **Readability**: Is the code well-commented (where necessary) and consistently formatted according to our project's coding style guidelines?
-*   **Efficiency**: Are there any obvious performance bottlenecks or resource inefficiencies introduced by the changes?
-*   **Security**: Are there any potential security vulnerabilities or insecure coding practices?
-*   **Edge Cases and Error Handling**: Does the code appropriately handle edge cases and potential errors?
-*   **Testability**: Is the new or modified code adequately covered by tests (even if preflight checks pass)? Suggest additional test cases that would improve coverage or robustness.
-*   **Over-Engineering / Dead Code**:
-    - Are there any unused methods, classes, imports, or variables?
-    - Is there unnecessary abstraction (e.g., interfaces with only one implementation, 
-      factory patterns for a single type)?
-    - Does the code follow the YAGNI principle — only implementing what is currently needed?
-    - Are there speculative features or overly generic designs that add complexity 
-      without clear, immediate benefit?
-    - Flag any code that exists "just in case" but has no current caller or test.
+```bash
+git status
+git diff               # working tree
+git diff --staged      # staged
+```
 
-    
-### 4. Provide Feedback
+若變更規模較大，詢問是否先執行 `./mvnw verify`。
 
-#### Structure
-*   **Summary**: A high-level overview of the review.
-*   **Findings**:
-    *   **Critical**: Bugs, security issues, or breaking changes.
-    *   **Improvements**: Suggestions for better code quality or performance.
-    *   **Nitpicks**: Formatting or minor style issues (optional).
-*   **Conclusion**: Clear recommendation (Approved / Request Changes).
+### 3. 深度分析
 
-#### Tone
-*   Be constructive, professional, and friendly.
-*   Explain *why* a change is requested.
-*   For approvals, acknowledge the specific value of the contribution.
+| 面向 | 檢查重點 |
+|------|---------|
+| **正確性** | 程式碼是否達成預期目標？有無邏輯錯誤？ |
+| **可維護性** | 結構是否清晰？是否遵循專案架構（Clean Arch / 三層式）？ |
+| **可讀性** | 命名是否語意清楚？有無不必要的複雜度？ |
+| **效能** | 是否有明顯的效能瓶頸、N+1 查詢、不必要的資源消耗？ |
+| **安全性** | 是否有注入漏洞、敏感資料外洩、不安全的預設值？ |
+| **例外處理** | 邊界情況與錯誤是否妥善處理？ |
+| **測試** | 是否有對應的測試？覆蓋率是否足夠？有無缺少邊界測試？ |
+| **過度設計** | 有無未使用的方法 / 類別 / import？有無「以防萬一」的程式碼？是否違反 YAGNI？ |
 
-### 5. Cleanup (Remote PRs only)
-*   After the review, ask the user if they want to switch back to the default branch (e.g., `main` or `master`).
+### 4. 回饋格式
+
+```
+## 摘要
+（一段話說明整體印象）
+
+## 發現
+
+### 🔴 Critical（必須修改）
+- 問題描述 + 為什麼有問題 + 建議修法
+
+### 🟡 Improvements（建議改善）
+- 問題描述 + 建議
+
+### 🔵 Nitpicks（可選，小細節）
+- 描述
+
+## 結論
+✅ 核准 / ❌ 請修改
+```
+
+**語氣原則**：
+- 建設性、具體，說明「為什麼」
+- 核准時點出此次貢獻的具體價值
+
+### 5. 收尾（遠端 PR）
+
+詢問是否要切回主分支（`main` / `master`）。
+
+---
+
+## 收到 Review 回饋時的原則
+
+若你正在**接受** review（不是給 review）：
+
+- **先驗證再實作**：收到建議後，先確認建議是否符合目前程式碼的實際狀況，再決定是否採用
+- **不做表演式同意**：不要只回「好建議！」就照做；若有疑問或不同意，用技術理由說明
+- **逐條確認**：Critical 項目必須修正；Improvements 評估後決定；Nitpicks 自行判斷
